@@ -84,8 +84,7 @@
       inventory.forEach(item => {
         const row = document.createElement("tr");
         const available = item.total - data.filter(d => d.bike === item.type).length;
-        
-        
+
         row.innerHTML = `
           <td>${item.type}</td>
           <td>${item.total}</td>
@@ -95,16 +94,43 @@
             <button onclick="deleteInventory('${item.type}')">Sil</button>
           </td>
         `;
-
-
         inventoryTableBody.appendChild(row);
+
         if (available > 0) {
           bikeSelect.innerHTML += `<option value="${item.type}">${item.type} (${available})</option>`;
         }
       });
     }
 
-    
+    function renderTable() {
+      bikeTableBody.innerHTML = "";
+      const today = new Date();
+
+      data.forEach((entry, index) => {
+        const start = new Date(entry.startDate);
+        const daysPassed = Math.floor((today - start) / (1000 * 60 * 60 * 24));
+        const weeksPassed = Math.floor(daysPassed / 7);
+        const nextPaymentDate = new Date(start);
+        nextPaymentDate.setDate(start.getDate() + (weeksPassed + 1) * 7);
+        entry.nextPayment = nextPaymentDate.toISOString().split("T")[0];
+
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${entry.bike}</td>
+          <td>${entry.courier}</td>
+          <td>${entry.vin}</td>
+          <td>${entry.startDate}</td>
+          <td>${entry.price}</td>
+          <td>${entry.nextPayment}</td>
+          <td>${entry.note}</td>
+          <td><button onclick="editEntry(${index})">Düzenle</button></td>
+        `;
+        bikeTableBody.appendChild(row);
+      });
+
+      saveAll();
+    }
+
     function addInventory() {
       const type = document.getElementById("inventoryType").value;
       const count = parseInt(document.getElementById("inventoryCount").value);
@@ -116,7 +142,6 @@
       }
 
       if (originalType && originalType !== type) {
-        // Remove the old entry if name changed
         inventory = inventory.filter(i => i.type !== originalType);
       }
 
@@ -132,25 +157,6 @@
       document.getElementById("inventoryType").value = "";
       document.getElementById("inventoryCount").value = "";
       document.getElementById("editInventoryType").value = "";
-    }
-
-
-    function renderTable() {
-      bikeTableBody.innerHTML = "";
-      data.forEach((entry, index) => {
-        const row = document.createElement("tr");
-        row.innerHTML = `
-          <td>${entry.bike}</td>
-          <td>${entry.courier}</td>
-          <td>${entry.vin}</td>
-          <td>${entry.startDate}</td>
-          <td>${entry.price}</td>
-          <td>${entry.nextPayment}</td>
-          <td>${entry.note}</td>
-          <td><button onclick="editEntry(${index})">Düzenle</button></td>
-        `;
-        bikeTableBody.appendChild(row);
-      });
     }
 
     function addOrUpdateEntry() {
@@ -191,8 +197,9 @@
       }
 
       saveAll();
-      
-    renderTable();
+      renderTable();
+      clearForm();
+    }
 
     function deleteInventory(type) {
       if (confirm(type + " türündeki bisikleti silmek istediğinize emin misiniz?")) {
@@ -202,7 +209,6 @@
       }
     }
 
-
     function editInventory(type) {
       document.getElementById("editInventoryType").value = type;
       const item = inventory.find(i => i.type === type);
@@ -210,10 +216,6 @@
         document.getElementById("inventoryType").value = item.type;
         document.getElementById("inventoryCount").value = item.total;
       }
-    }
-
-      renderInventory();
-      clearForm();
     }
 
     function editEntry(index) {
@@ -237,27 +239,8 @@
     }
 
     renderInventory();
-    
     renderTable();
-
-    function deleteInventory(type) {
-      if (confirm(type + " türündeki bisikleti silmek istediğinize emin misiniz?")) {
-        inventory = inventory.filter(i => i.type !== type);
-        saveAll();
-        renderInventory();
-      }
-    }
-
-
-    function editInventory(type) {
-      document.getElementById("editInventoryType").value = type;
-      const item = inventory.find(i => i.type === type);
-      if (item) {
-        document.getElementById("inventoryType").value = item.type;
-        document.getElementById("inventoryCount").value = item.total;
-      }
-    }
-
   </script>
 </body>
 </html>
+
