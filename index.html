@@ -3,116 +3,115 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
-  <title>BikeTrack Yönetim Paneli</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    h2, h3 { color: #333; }
-    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-    th { background-color: #f2f2f2; }
-    input, button, select { padding: 8px; margin: 5px 5px 5px 0; }
-    .form, .inventory-form { margin-top: 30px; }
-  </style>
-</head>
-<body>
-  <h2>BikeTrack Yönetim Paneli</h2>
+  <title>BikeTrack Online</title>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getFirestore, collection, getDocs, addDoc, setDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
-  <h3>Envanter</h3>
-  <table id="inventoryTable">
-    <thead>
-      <tr>
-        <th>Bisiklet Türü</th>
-        <th>Toplam Adet</th>
-        <th>Boşta</th>
-        <th>İşlem</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDchCKogW7II_cAW0VUhc01elixEr56vEU",
+      authDomain: "rent-a-bike-354bd.firebaseapp.com",
+      projectId: "rent-a-bike-354bd",
+      storageBucket: "rent-a-bike-354bd.firebasestorage.app",
+      messagingSenderId: "1097573956413",
+      appId: "1:1097573956413:web:391e9e2531623bbb1c2354",
+      measurementId: "G-LEC08GQ2T2"
+    };
 
-  <div class="inventory-form">
-    <input type="text" id="inventoryType" placeholder="Bisiklet Türü">
-    <input type="number" id="inventoryCount" placeholder="Adet">
-    <input type="hidden" id="editInventoryType">
-    <button onclick="addInventory()">Ekle / Güncelle</button>
-  </div>
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-  <h3>Kiralama Listesi</h3>
-  <table id="bikeTable">
-    <thead>
-      <tr>
-        <th>Bisiklet Türü</th>
-        <th>Kurye</th>
-        <th>VIN</th>
-        <th>Başlama Tarihi</th>
-        <th>Ücret (haftalık)</th>
-        <th>Sonraki Ödeme</th>
-        <th>Not</th>
-        <th>İşlem</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-
-  <div class="form">
-    <h3 id="formTitle">Yeni Kiralama Ekle</h3>
-    <select id="bikeSelect"></select>
-    <input type="text" id="courier" placeholder="Kurye Adı">
-    <input type="text" id="vin" placeholder="VIN Numarası">
-    <input type="date" id="startDate">
-    <input type="number" id="price" placeholder="Haftalık Ücret">
-    <button onclick="addOrUpdateEntry()">Kaydet</button>
-    <input type="hidden" id="editIndex">
-  </div>
-
-  <script>
     const bikeTableBody = document.querySelector("#bikeTable tbody");
     const inventoryTableBody = document.querySelector("#inventoryTable tbody");
     const bikeSelect = document.getElementById("bikeSelect");
 
-    let inventory = JSON.parse(localStorage.getItem("bikeInventory")) || [];
-    let data = JSON.parse(localStorage.getItem("bikeData")) || [];
+    let inventory = [];
+    let data = [];
 
-    function saveAll() {
-      localStorage.setItem("bikeInventory", JSON.stringify(inventory));
-      localStorage.setItem("bikeData", JSON.stringify(data));
+    async function loadInventory() {
+      const snapshot = await getDocs(collection(db, "inventory"));
+      inventory = snapshot.docs.map(doc => doc.data());
+      renderInventory();
+    }
+
+    async function loadData() {
+      const snapshot = await getDocs(collection(db, "rentals"));
+      data = snapshot.docs.map(doc => doc.data());
+      renderTable();
+    }
+
+    async function addInventory() {
+      const type = document.getElementById("inventoryType").value;
+      const count = parseInt(document.getElementById("inventoryCount").value);
+      if (!type || isNaN(count)) return alert("Eksik bilgi");
+
+      await setDoc(doc(db, "inventory", type), { type, total: count });
+
+      document.getElementById("inventoryType").value = "";
+      document.getElementById("inventoryCount").value = "";
+      loadInventory();
     }
 
     function renderInventory() {
       inventoryTableBody.innerHTML = "";
       bikeSelect.innerHTML = "<option value=''>Bisiklet Seç</option>";
       inventory.forEach(item => {
-        const row = document.createElement("tr");
         const available = item.total - data.filter(d => d.bike === item.type).length;
-
+        const row = document.createElement("tr");
         row.innerHTML = `
           <td>${item.type}</td>
           <td>${item.total}</td>
           <td>${available}</td>
-          <td>
-            <button onclick="editInventory('${item.type}')">Düzenle</button>
-            <button onclick="deleteInventory('${item.type}')">Sil</button>
-          </td>
+          <td><button onclick="deleteInventory('${item.type}')">Sil</button></td>
         `;
         inventoryTableBody.appendChild(row);
-
         if (available > 0) {
           bikeSelect.innerHTML += `<option value="${item.type}">${item.type} (${available})</option>`;
         }
       });
     }
 
+    async function deleteInventory(type) {
+      await deleteDoc(doc(db, "inventory", type));
+      loadInventory();
+    }
+
+    async function addOrUpdateEntry() {
+      const bike = document.getElementById("bikeSelect").value;
+      const courier = document.getElementById("courier").value;
+      const vin = document.getElementById("vin").value;
+      const startDate = document.getElementById("startDate").value;
+      const price = document.getElementById("price").value;
+      if (!bike || !courier || !vin || !startDate || !price) return alert("Eksik bilgi");
+
+      const start = new Date(startDate);
+      const today = new Date();
+      const daysPassed = Math.floor((today - start) / (1000 * 60 * 60 * 24));
+      const weeksPassed = Math.floor(daysPassed / 7);
+      const nextPayment = new Date(start);
+      nextPayment.setDate(start.getDate() + (weeksPassed + 1) * 7);
+
+      const entry = {
+        bike, courier, vin, startDate,
+        price: price + " zł",
+        nextPayment: nextPayment.toISOString().split("T")[0],
+        note: ""
+      };
+
+      await addDoc(collection(db, "rentals"), entry);
+      loadData();
+    }
+
     function renderTable() {
       bikeTableBody.innerHTML = "";
       const today = new Date();
-
-      data.forEach((entry, index) => {
+      data.forEach(entry => {
         const start = new Date(entry.startDate);
         const daysPassed = Math.floor((today - start) / (1000 * 60 * 60 * 24));
         const weeksPassed = Math.floor(daysPassed / 7);
-        const nextPaymentDate = new Date(start);
-        nextPaymentDate.setDate(start.getDate() + (weeksPassed + 1) * 7);
-        entry.nextPayment = nextPaymentDate.toISOString().split("T")[0];
+        const nextPayment = new Date(start);
+        nextPayment.setDate(start.getDate() + (weeksPassed + 1) * 7);
+        entry.nextPayment = nextPayment.toISOString().split("T")[0];
 
         const row = document.createElement("tr");
         row.innerHTML = `
@@ -123,124 +122,57 @@
           <td>${entry.price}</td>
           <td>${entry.nextPayment}</td>
           <td>${entry.note}</td>
-          <td><button onclick="editEntry(${index})">Düzenle</button></td>
+          <td></td>
         `;
         bikeTableBody.appendChild(row);
       });
-
-      saveAll();
     }
 
-    function addInventory() {
-      const type = document.getElementById("inventoryType").value;
-      const count = parseInt(document.getElementById("inventoryCount").value);
-      const originalType = document.getElementById("editInventoryType").value;
-
-      if (!type || isNaN(count)) {
-        alert("Bisiklet türü ve adet girin.");
-        return;
-      }
-
-      if (originalType && originalType !== type) {
-        inventory = inventory.filter(i => i.type !== originalType);
-      }
-
-      const existing = inventory.find(i => i.type === type);
-      if (existing) {
-        existing.total = count;
-      } else {
-        inventory.push({ type, total: count });
-      }
-
-      saveAll();
-      renderInventory();
-      document.getElementById("inventoryType").value = "";
-      document.getElementById("inventoryCount").value = "";
-      document.getElementById("editInventoryType").value = "";
-    }
-
-    function addOrUpdateEntry() {
-      const bike = document.getElementById("bikeSelect").value;
-      const courier = document.getElementById("courier").value;
-      const vin = document.getElementById("vin").value;
-      const startDate = document.getElementById("startDate").value;
-      const price = document.getElementById("price").value;
-      const editIndex = document.getElementById("editIndex").value;
-
-      if (!bike || !courier || !vin || !startDate || !price) {
-        alert("Tüm alanları doldurun.");
-        return;
-      }
-
-      const start = new Date(startDate);
-      const today = new Date();
-      const daysPassed = Math.floor((today - start) / (1000 * 60 * 60 * 24));
-      const weeksPassed = Math.floor(daysPassed / 7);
-      const nextPayment = new Date(start);
-      nextPayment.setDate(start.getDate() + (weeksPassed + 1) * 7);
-
-      const entry = {
-        bike,
-        courier,
-        vin,
-        startDate,
-        price: price + " zł",
-        nextPayment: nextPayment.toISOString().split("T")[0],
-        note: ""
-      };
-
-      if (editIndex === "") {
-        data.push(entry);
-      } else {
-        data[editIndex] = entry;
-        document.getElementById("formTitle").innerText = "Yeni Kiralama Ekle";
-      }
-
-      saveAll();
-      renderTable();
-      clearForm();
-    }
-
-    function deleteInventory(type) {
-      if (confirm(type + " türündeki bisikleti silmek istediğinize emin misiniz?")) {
-        inventory = inventory.filter(i => i.type !== type);
-        saveAll();
-        renderInventory();
-      }
-    }
-
-    function editInventory(type) {
-      document.getElementById("editInventoryType").value = type;
-      const item = inventory.find(i => i.type === type);
-      if (item) {
-        document.getElementById("inventoryType").value = item.type;
-        document.getElementById("inventoryCount").value = item.total;
-      }
-    }
-
-    function editEntry(index) {
-      const entry = data[index];
-      document.getElementById("bikeSelect").value = entry.bike;
-      document.getElementById("courier").value = entry.courier;
-      document.getElementById("vin").value = entry.vin;
-      document.getElementById("startDate").value = entry.startDate;
-      document.getElementById("price").value = entry.price.replace(" zł", "");
-      document.getElementById("editIndex").value = index;
-      document.getElementById("formTitle").innerText = "Kiralama Bilgilerini Düzenle";
-    }
-
-    function clearForm() {
-      document.getElementById("bikeSelect").value = "";
-      document.getElementById("courier").value = "";
-      document.getElementById("vin").value = "";
-      document.getElementById("startDate").value = "";
-      document.getElementById("price").value = "";
-      document.getElementById("editIndex").value = "";
-    }
-
-    renderInventory();
-    renderTable();
+    loadInventory();
+    loadData();
   </script>
+</head>
+<body>
+  <h2>BikeTrack Online (Firebase)</h2>
+
+  <h3>Envanter</h3>
+  <table id="inventoryTable">
+    <thead>
+      <tr>
+        <th>Bisiklet Türü</th>
+        <th>Toplam</th>
+        <th>Boşta</th>
+        <th>İşlem</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <input type="text" id="inventoryType" placeholder="Tür">
+  <input type="number" id="inventoryCount" placeholder="Adet">
+  <button onclick="addInventory()">Kaydet</button>
+
+  <h3>Kiralama</h3>
+  <table id="bikeTable">
+    <thead>
+      <tr>
+        <th>Bisiklet</th>
+        <th>Kurye</th>
+        <th>VIN</th>
+        <th>Başlama</th>
+        <th>Ücret</th>
+        <th>Ödeme</th>
+        <th>Not</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <select id="bikeSelect"></select>
+  <input type="text" id="courier" placeholder="Kurye Adı">
+  <input type="text" id="vin" placeholder="VIN">
+  <input type="date" id="startDate">
+  <input type="number" id="price" placeholder="Haftalık Ücret">
+  <button onclick="addOrUpdateEntry()">Kaydet</button>
 </body>
 </html>
-
